@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# downloaded map sources (large, re-fetchable)
+.tmp/
+
+# annotation output
+annotations/
