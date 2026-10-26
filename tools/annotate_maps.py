@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import tkinter as tk
 from pathlib import Path
@@ -32,8 +33,43 @@ from tkinter import messagebox, ttk
 import numpy as np
 from PIL import Image, ImageDraw, ImageTk
 
-ROOT = Path(os.environ.get("SQUAD_MAP_ROOT") or Path(__file__).resolve().parents[1])
-CATALOG = json.loads((ROOT / "tools" / "maps_catalog.json").read_text(encoding="utf-8"))
+
+def _default_root() -> Path:
+    """Where tools/, .tmp/ and annotations/ live.
+
+    Frozen (PyInstaller) builds put __file__ inside a temporary _MEIPASS
+    folder, so for the exe the meaningful root is the folder that holds it;
+    a source run uses the repo root (the parent of tools/).
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
+
+
+def _fatal(message: str) -> None:
+    """Report a startup problem even before (or without) a Tk window."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, message, "map-water-bridge-annotator", 0x10)
+    except Exception:
+        print(message)
+    raise SystemExit(1)
+
+
+ROOT = Path(os.environ.get("SQUAD_MAP_ROOT") or _default_root())
+CATALOG_FILE = ROOT / "tools" / "maps_catalog.json"
+try:
+    CATALOG = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    _fatal(
+        "找不到工具数据：\n"
+        + str(CATALOG_FILE)
+        + "\n\n请把 map-water-bridge-annotator.exe 放在仓库根目录（和 tools\\ 同级），\n"
+        "或先运行 start-annotator.bat 启动。\n"
+    )
+except (OSError, ValueError) as exc:
+    _fatal("无法读取 " + str(CATALOG_FILE) + "\n\n" + repr(exc))
+
 SOURCE = ROOT / ".tmp" / "maps_source"
 OUT = ROOT / "annotations"
 SIZE = 2048
@@ -621,7 +657,8 @@ class Annotator(tk.Tk):
             topo_path = src / "topomap.webp"
             topo = Image.open(topo_path).convert("RGB").resize((SIZE, SIZE), Image.Resampling.LANCZOS) if topo_path.exists() else base
         except Exception as exc:
-            messagebox.showerror("地图加载失败", f"{slug}\n{exc}\n\n需要 .tmp/maps_source（先运行 tools/download_maps.py）。")
+            messagebox.showerror("地图加载失败", f"{slug}\n{exc}\n\n缺少地图源数据：先双击 start-annotator.bat，"
+                                 f"或运行 tools\\download_maps.ps1 下载。")
             return
 
         self.slug = slug
