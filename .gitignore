@@ -8,3 +8,6 @@ venv/
 
 # annotation output
 annotations/
+
+# local GitHub token / project-root override for the upload button
+tools/github-upload.json

@@ -17,7 +17,8 @@ Python + tkinter + Pillow + numpy，单文件脚本；Release 里也附了免装
 | `tools/annotate_maps.py` | 同一份工具的源码，`pip install pillow numpy` 后直接跑 |
 
 exe 也在 [Releases](https://github.com/copperbookworm/map-water-bridge-annotator/releases/latest) 里。
-**用法：把 exe 放到仓库根目录（和 `tools\` 同级）再双击**，它就以自己所在的文件夹为工作根目录。
+**用法：把 exe 放到仓库根目录（和 `tools\` 同级）再双击**，它就以自己所在的文件夹为工作根目录；
+放在子目录（比如 `dist\`）也行，它会往上找到带 `tools\maps_catalog.json` 的那一层。
 exe 没有代码签名，首次运行 Windows 可能弹 SmartScreen / 杀软提示，选“仍要运行”即可。
 
 ## 运行
@@ -151,6 +152,31 @@ python tools/build_maps.py --only narva
 
 生成器把它们和其它栅格一起内联进单页 HTML（每张图一页），Android App 与桌面浏览器共用。
 
+## 一键上传到 GitHub（发数据包，不用命令行）
+
+工具栏第二个按钮「上传数据到 GitHub」把工程里**已经生成好的** `dist/maps-data/` 直接发布到
+[Yehorivka-MapData](https://github.com/copperbookworm/Yehorivka-MapData)，玩家在 App 里
+「地图数据 · 在线更新 → 检查更新」就能拿到，不用重装 APK。
+
+- 面板先列出数据目录、文件数、总量、最近构建时间，以及**哪些图的标注比数据包新**（有就提示先重建）；
+- 点「开始上传」后：先逐个比对本地与远端的 git blob sha（只读，不动远端），
+  **只上传内容变了的文件**，没变的记「无变化」直接跳过；
+- 上传顺序固定为「所有地图包 → 最后 manifest.json」，App 不会看到指向不存在文件的清单；
+- 全程有进度：整体进度条、当前文件进度条、速度（MB/s）、已传 / 总量、剩余时间，
+  外加网络状态行（连接中 / RTT / API 配额 / 正在传哪个文件 / 第几次重试 / 失败原因）；
+- 失败原因说人话：401 = token 失效，403 = 没权限或限流，404 = 仓库或分支不存在，
+  422 = 远端文件在此期间被改过（再点一次上传即可）。
+
+「先重建数据包」按钮在后台跑 `python tools/build_maps.py`（输出流式打进日志面板，约 4–5 分钟），
+需要本机有 python + numpy + Pillow；没有就直接告诉你该手动跑什么命令。
+
+GitHub 登录按顺序找：环境变量 `GITHUB_TOKEN` → `tools/github-upload.json` 里的 `token`
+→ 系统 `git credential fill`（本机在 git 里登录过 github.com 就自动读到）→ 面板「更新 token…」粘贴。
+token 需要该仓库的 **Contents 读写**权限；`tools/github-upload.json` 已在 `.gitignore` 里。
+
+工程根目录探测顺序：`SQUAD_PROJECT_ROOT` → 配置里的 `project_root` → exe 所在目录往上 4 级，
+取同时有 `tools/build_maps.py` 和 `dist/maps-data/manifest.json` 的那个目录。
+
 ## 仓库结构
 
 ```
@@ -160,6 +186,7 @@ tools/annotate_maps.py             标注器源码（tkinter / Pillow / numpy）
 tools/download_maps.ps1            下载地图源数据（纯 PowerShell，免 Python）
 tools/download_maps.py             同上，Python 版
 tools/maps_catalog.json            25 张图的 slug、边界、高度缩放
+tools/github-upload.json           （可选）上传用的 token / 工程目录，已被 .gitignore 忽略
 docs/annotator.png                 README 截图
 ```
 
@@ -168,7 +195,8 @@ docs/annotator.png                 README 截图
 - 标注是 2048 栅格上的手工近似，不是逐件模型判定；边缘 1–2 像素的误差会被下采样抹平，也可能吃掉窄桥；
 - 画面按底图像素坐标对齐，换底图（卫星 / 地形）不影响标注（同一几何），但**不要**在标注中途换图源分辨率；
 - "测高度"依赖 `heightmap.png` 的红 / 蓝通道编码，缺这张图时工具会提示读不到；
-- 一张图一张标注，没有图层复制 / 批量迁移功能。
+- 一张图一张标注，没有图层复制 / 批量迁移功能；
+- 上传只发布 `dist/maps-data/` 里的数据包与清单，源码 / 底图原图不在上传范围内。
 
 
 - exe 是未签名的 PyInstaller 单文件包，首次运行可能被杀软 / SmartScreen 拦一下，选“仍要运行”；
